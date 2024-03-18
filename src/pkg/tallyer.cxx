@@ -169,6 +169,7 @@ void TallyerClient::HandleTally(std::shared_ptr<NetworkDriver> network_driver,
   bool user_voted = this->db_driver->vote_exists(vote_msg.vote);
   if (user_voted) {
     throw std::runtime_error("User has already voted");
+    network_driver->disconnect();
   }
 
   // Verifies the server's signature and ZKP

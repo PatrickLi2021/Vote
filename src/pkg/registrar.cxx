@@ -169,10 +169,11 @@ void RegistrarClient::HandleRegister(
     registered = false;
   }
 
-  // If user has not yet registered, send back existing signature
+  // If user has already registered, send back existing signature
   if (registered) {
     RegistrarToVoter_Blind_Signature_Message blind_sig_msg;
     blind_sig_msg.registrar_signature = found_voter.registrar_signature;
+    blind_sig_msg.id = found_voter.id;
     auto blind_sig_msg_bytes = crypto_driver->encrypt_and_tag(aes_key, hmac_key, &blind_sig_msg);
     network_driver->send(blind_sig_msg_bytes);
   }
