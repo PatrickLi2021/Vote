@@ -164,7 +164,7 @@ void RegistrarClient::HandleRegister(
   
   // Check if the user has registered before
   VoterRow found_voter = this->db_driver->find_voter(user_info_msg.id);
-  bool registered;
+  bool registered = true;
   if (found_voter.id == "") {
     registered = false;
   }
