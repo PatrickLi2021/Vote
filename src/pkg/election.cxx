@@ -19,54 +19,55 @@ ElectionClient::GenerateVote(CryptoPP::Integer vote, CryptoPP::Integer pk) {
   initLogger();
   
   CryptoPP::AutoSeededRandomPool rng;
+  CryptoPP::Integer r(rng, 2, DL_Q - 1);
   
   // Populate the Vote_Ciphertext struct
-  CryptoPP::Integer r(rng, 2, DL_Q - 1);
-  auto c_1 = CryptoPP::ModularExponentiation(DL_G, r, DL_P);
-  auto pk_to_r = CryptoPP::ModularExponentiation(pk, r, 1);
-  auto g_to_vote = CryptoPP::ModularExponentiation(DL_G, vote, 1);
-  auto c_2 = a_times_b_mod_c(pk_to_r, g_to_vote, DL_P);
   Vote_Ciphertext vote_cipher;
-  vote_cipher.a = c_1;
-  vote_cipher.b = c_2;
+  if (vote == 0) {
+    vote_cipher.b = CryptoPP::ModularExponentiation(pk, r, DL_P);
+  }
+  else {
+    auto g_to_vote = CryptoPP::ModularExponentiation(DL_G, vote, DL_P);
+    auto pk_to_r = CryptoPP::ModularExponentiation(pk, r, DL_P);
+    vote_cipher.b = a_times_b_mod_c(g_to_vote, pk_to_r, DL_P);
+  }
+  vote_cipher.a = CryptoPP::ModularExponentiation(DL_G, r, DL_P);
 
   // Populate VoteZKP_Struct
   VoteZKP_Struct vote_zkp;
   CryptoPP::Integer r0(rng, 2, DL_Q - 1);
   
   if (vote == 0) {
-    // Randomly sample r_1
+    // Randomly sample r_1" and sigma_1/c_1
     CryptoPP::Integer r_double_prime_1(rng, 2, DL_Q - 1);
     vote_zkp.r1 = r_double_prime_1;
-    // Randomly sample sigma_1
     CryptoPP::Integer sigma_1(rng, 2, DL_Q - 1);
     vote_zkp.c1 = sigma_1;
-    // Calculate a0 = g^r'0 (mod p)
-    CryptoPP::Integer r_prime_0(rng, 2, DL_Q - 1);
-    vote_zkp.a0 = CryptoPP::ModularExponentiation(DL_G, r_prime_0, DL_P);
-    // Calculate b0 = pk^r'0 mod p
-    vote_zkp.b0 = CryptoPP::ModularExponentiation(pk, r_prime_0, DL_P);
     
+    // Calculate b' = b/g^1 (mod p)
+    auto b_prime = a_times_b_mod_c(vote_cipher.b, CryptoPP::EuclideanMultiplicativeInverse(DL_G, DL_P), DL_P);
+
     // Calculate a1 = g^r1" / a^sigma1 (mod p)
     auto g_to_r1 = CryptoPP::ModularExponentiation(DL_G, vote_zkp.r1, DL_P);
-    auto a_to_sigma1_mod_p = CryptoPP::EuclideanMultiplicativeInverse(CryptoPP::ModularExponentiation(vote_cipher.a, sigma_1, DL_P), DL_P);
-    vote_zkp.a1 = a_times_b_mod_c(g_to_r1, a_to_sigma1_mod_p, DL_P);
+    auto a_to_sigma1_inverse = CryptoPP::EuclideanMultiplicativeInverse(CryptoPP::ModularExponentiation(vote_cipher.a, sigma_1, DL_P), DL_P);
+    vote_zkp.a1 = a_times_b_mod_c(g_to_r1, a_to_sigma1_inverse, DL_P);
     
-    // Calculate b' = b / g^1 (mod p)
-    auto b_prime = CryptoPP::ModularExponentiation(vote_cipher.b, CryptoPP::EuclideanMultiplicativeInverse(DL_G, DL_P), DL_P);
     // Calculate b1 = pk^(r1") / (b')^c1 (mod p)
-    auto b_prime_to_c1_mod_p = CryptoPP::ModularExponentiation(b_prime, vote_zkp.c1, DL_P);
     auto pk_to_r1_double_prime_mod_p = CryptoPP::ModularExponentiation(pk, r_double_prime_1, DL_P);
-    vote_zkp.b1 = a_times_b_mod_c(pk_to_r1_double_prime_mod_p, CryptoPP::EuclideanMultiplicativeInverse(b_prime_to_c1_mod_p, DL_P), DL_P);
+    auto b_prime_to_c1_inverse_mod_p = CryptoPP::EuclideanMultiplicativeInverse(CryptoPP::ModularExponentiation(b_prime, vote_zkp.c1, DL_P), DL_P);
+    vote_zkp.b1 = a_times_b_mod_c(pk_to_r1_double_prime_mod_p, b_prime_to_c1_inverse_mod_p, DL_P);
 
-
+    // Calculate a0 = g^r'0 (mod p) and b0 = pk^r'0 mod p
+    CryptoPP::Integer r_prime_0(rng, 2, DL_Q - 1);
+    vote_zkp.a0 = CryptoPP::ModularExponentiation(DL_G, r_prime_0, DL_P);
+    vote_zkp.b0 = CryptoPP::ModularExponentiation(pk, r_prime_0, DL_P);
+    
     // Calculate sigma or c = H(pk, a, b, a'0, b'0, a'1, b'1)
     auto sigma = hash_vote_zkp(pk, vote_cipher.a, vote_cipher.b, vote_zkp.a0, vote_zkp.b0, vote_zkp.a1, vote_zkp.b1);
     // Calculate sigma0 or c0 = sigma1 - sigma (mod q)
-    auto sigma_0 = (sigma - vote_zkp.c1) % DL_Q;
-    vote_zkp.c0 = sigma_0; 
+    vote_zkp.c0 = (sigma - vote_zkp.c1) % DL_Q;
     // Calculate r0" = r'0 + c0 * r (mod q)
-    vote_zkp.r1 = vote_zkp.r0 + a_times_b_mod_c(vote_zkp.c0, r, DL_Q);
+    vote_zkp.r0 = r0 + a_times_b_mod_c(vote_zkp.c0, r, DL_Q);
   }
   else {
     // Compute and set c0 and r0
@@ -76,14 +77,14 @@ ElectionClient::GenerateVote(CryptoPP::Integer vote, CryptoPP::Integer pk) {
     vote_zkp.r0 = r_double_prime_0;
 
     // Compute and set a0 in struct
-    auto a_to_c0 = CryptoPP::ModularExponentiation(vote_cipher.a, vote_zkp.c0, DL_P);
-    auto g_to_r_double_prime_0 = a_exp_b_mod_c(DL_G, vote_zkp.r0, DL_P);
-    vote_zkp.a0 = a_times_b_mod_c(g_to_r_double_prime_0, CryptoPP::EuclideanMultiplicativeInverse(a_to_c0, DL_P), DL_P);
+    auto g_to_r_double_prime_0 = CryptoPP::ModularExponentiation(DL_G, vote_zkp.r0, DL_P);
+    auto a_to_c0_inverse = CryptoPP::EuclideanMultiplicativeInverse(CryptoPP::ModularExponentiation(vote_cipher.a, vote_zkp.c0, DL_P), DL_P);
+    vote_zkp.a0 = a_times_b_mod_c(g_to_r_double_prime_0, a_to_c0_inverse, DL_P);
 
     // Compute and set b0 in struct
-    auto b_to_c0 = a_exp_b_mod_c(vote_cipher.b, vote_zkp.c0, DL_P);
     auto pk_to_r_double_prime_0 = CryptoPP::ModularExponentiation(pk, vote_zkp.r0, DL_P);
-    vote_zkp.b0 = a_times_b_mod_c(pk_to_r_double_prime_0, CryptoPP::EuclideanMultiplicativeInverse(b_to_c0, DL_P), DL_P);
+    auto b_to_c0_inverse = CryptoPP::EuclideanMultiplicativeInverse(CryptoPP::ModularExponentiation(vote_cipher.b, vote_zkp.c0, DL_P), DL_P);
+    vote_zkp.b0 = a_times_b_mod_c(pk_to_r_double_prime_0, b_to_c0_inverse, DL_P);
 
     // Compute and set a1 and b1 in struct
     CryptoPP::Integer r_1_prime(rng, 2, DL_Q - 1);
@@ -92,14 +93,14 @@ ElectionClient::GenerateVote(CryptoPP::Integer vote, CryptoPP::Integer pk) {
     
     // Get the challenge/sigma and compute c1
     auto sigma = hash_vote_zkp(pk, vote_cipher.a, vote_cipher.b, vote_zkp.a0, vote_zkp.b0, vote_zkp.a1, vote_zkp.b1);
-    auto sigma_1 = (sigma - vote_zkp.c1) % DL_Q;
-    vote_zkp.c1 = sigma_1;
+    vote_zkp.c1 = (sigma - vote_zkp.c0) % DL_Q;
   
     // Compute r1
     vote_zkp.r1 = r_1_prime + a_times_b_mod_c(vote_zkp.c1, r, DL_Q);
   }
   return std::make_pair(vote_cipher, vote_zkp);
 }
+
 
 /**
  * Verify vote zkp.
@@ -108,40 +109,37 @@ bool ElectionClient::VerifyVoteZKP(
     std::pair<Vote_Ciphertext, VoteZKP_Struct> vote, CryptoPP::Integer pk) {
   initLogger();
   auto [vote_cipher, vote_zkp] = vote;
-  
-  // Verify that sigma0 + sigma1 = sigma (mod q)
-  auto sigma = hash_vote_zkp(pk, vote_cipher.a, vote_cipher.b, vote_zkp.a0, vote_zkp.b0, vote_zkp.a1, vote_zkp.b1);
-  if (vote_zkp.c0 + vote_zkp.c1 != sigma % DL_Q) {
-    return false;
-  }
-  // If the vote is an encryption of 0, we verify that g^(r"0) = a0 * a^(c0) (mod p) and pk^(r"0) = b0 * b^(c0) (mod p)
+
+  // Verify that g^(r"0) = a0' * a^(c0) (mod p) and pk^(r"0) = b0 * b^(c0) (mod p)
   auto g_to_r_double_prime_0 = CryptoPP::ModularExponentiation(DL_G, vote_zkp.r0, DL_P);
   auto a0_times_a_to_c0 = a_times_b_mod_c(vote_zkp.a0, CryptoPP::ModularExponentiation(vote_cipher.a, vote_zkp.c0, DL_P), DL_P);
-  auto valid_zero_statement_1 = g_to_r_double_prime_0 == a0_times_a_to_c0;
+  auto statement_1 = g_to_r_double_prime_0 == a0_times_a_to_c0;
   
-  auto pk_to_r_double_prime_0 = CryptoPP::ModularExponentiation(pk, vote_zkp.r0, DL_P);
-  auto b0_times_b_to_c0 = a_times_b_mod_c(vote_zkp.b0, CryptoPP::ModularExponentiation(vote_cipher.b, vote_zkp.c0, DL_P), DL_P);
-  auto valid_zero_statement_2 = pk_to_r_double_prime_0 == b0_times_b_to_c0;
-  auto valid_zero_vote = valid_zero_statement_1 && valid_zero_statement_2;
-  
-  // If the vote is an encryption of 1, we verify that g^(r"1) = A1 * c1^(sigma1) and pk^(r"1) = B1 * (c2 / g)^(sigma1)
+  // Verify that g^(r"1) = A1 * c1^(sigma1) and pk^(r"1) = B1 * (c2 / g)^(sigma1)
   auto g_to_r_double_prime_1 = CryptoPP::ModularExponentiation(DL_G, vote_zkp.r1, DL_P);
   auto a1_times_a_to_c1 = a_times_b_mod_c(vote_zkp.a1, CryptoPP::ModularExponentiation(vote_cipher.a, vote_zkp.c1, DL_P), DL_P);
-  auto valid_one_statement_1 = g_to_r_double_prime_1 == a1_times_a_to_c1;
+  auto statement_2 = g_to_r_double_prime_1 == a1_times_a_to_c1;
+
+  // Verify that pk^(r"0) = b'0 * b^(c0) (mod p)
+  auto pk_to_r_double_prime_0 = CryptoPP::ModularExponentiation(pk, vote_zkp.r0, DL_P);
+  auto b0_times_b_to_c0 = a_times_b_mod_c(vote_zkp.b0, CryptoPP::ModularExponentiation(vote_cipher.b, vote_zkp.c0, DL_P), DL_P);
+  auto statement_3 = pk_to_r_double_prime_0 == b0_times_b_to_c0;
   
+  // Verify that pk^(r_1") = b'1 * (b/g^1)^(c1) (mod p)
   auto pk_to_r_double_prime_1 = CryptoPP::ModularExponentiation(pk, vote_zkp.r1, DL_P);
-  
   auto b_div_g_to_c1 = CryptoPP::ModularExponentiation(a_times_b_mod_c(vote_cipher.b, CryptoPP::EuclideanMultiplicativeInverse(DL_G, DL_P), DL_P), vote_zkp.c1, DL_P);
   auto b1_times_b_div_g_to_c1 = a_times_b_mod_c(vote_zkp.b1, b_div_g_to_c1, DL_P);
-  auto valid_one_statement_2 = pk_to_r_double_prime_1 == b1_times_b_div_g_to_c1;
-  auto valid_one_vote = valid_one_statement_1 && valid_one_statement_2;
+  auto statement_4 = pk_to_r_double_prime_1 == b1_times_b_div_g_to_c1;
 
-  if (!valid_zero_vote || !valid_one_vote) {
-    return false;
-  }
-  else {
+  // Verify that sigma0 + sigma1 = sigma (mod q)
+  auto hash_value = hash_vote_zkp(pk, vote_cipher.a, vote_cipher.b, vote_zkp.a0, vote_zkp.b0, vote_zkp.a1, vote_zkp.b1) % DL_Q;
+  auto c0_plus_c1 = vote_zkp.c0 + vote_zkp.c1;
+  auto statement_5 = c0_plus_c1 == hash_value;
+
+  if (statement_1 && statement_2 && statement_3 && statement_4 && statement_5) {
     return true;
   }
+  return false;
 }
 
 /**
@@ -161,22 +159,18 @@ ElectionClient::PartialDecrypt(Vote_Ciphertext combined_vote,
   CryptoPP::Integer r(rng, 2, DL_Q - 1);
   
   // Compute (u, v)
-  auto u = CryptoPP::ModularExponentiation(combined_vote.a, r, DL_P);
-  auto v = CryptoPP::ModularExponentiation(DL_G, r, DL_P);
+  decryption_zkp.u = CryptoPP::ModularExponentiation(combined_vote.a, r, DL_P);
+  decryption_zkp.v = CryptoPP::ModularExponentiation(DL_G, r, DL_P);
 
   // Compute a challenge c using the hash function
-  auto c = hash_dec_zkp(pk, combined_vote.a, combined_vote.b, u, v);
+  auto c = hash_dec_zkp(pk, combined_vote.a, combined_vote.b, decryption_zkp.u, decryption_zkp.v);
 
   // Let s := r + c * ski (mod q) and compute decryption factor d := a^ski (mod p)
-  auto s = r + a_times_b_mod_c(c, sk, DL_Q);
-  auto d = CryptoPP::ModularExponentiation(combined_vote.a, sk, DL_P);
-
+  decryption_zkp.s = r + a_times_b_mod_c(c, sk, DL_Q);
+  
+  partial_dec.d = CryptoPP::ModularExponentiation(combined_vote.a, sk, DL_P);
   partial_dec.aggregate_ciphertext = combined_vote;
-  partial_dec.d = d;
 
-  decryption_zkp.s = s;
-  decryption_zkp.u = u;
-  decryption_zkp.v = v;
   return std::make_pair(partial_dec, decryption_zkp);
 }
 
@@ -188,18 +182,19 @@ bool ElectionClient::VerifyPartialDecryptZKP(
   initLogger();
   
   // Re-compute sigma
-  auto sigma = hash_dec_zkp(pki, a2w_dec_s.dec.aggregate_ciphertext.a, a2w_dec_s.dec.aggregate_ciphertext.b, a2w_dec_s.zkp.u, a2w_dec_s.zkp.v);
+  auto c = hash_dec_zkp(pki, a2w_dec_s.dec.aggregate_ciphertext.a, a2w_dec_s.dec.aggregate_ciphertext.b, a2w_dec_s.zkp.u, a2w_dec_s.zkp.v);
   
-  // Verify that g^s = v * pki^(sigma) and a^s = u * d^(sigma) (page 32 of book)
+  // Verify that g^s = v * pki^(sigma) (mod p) (page 32 of book)
   auto g_to_s = CryptoPP::ModularExponentiation(DL_G, a2w_dec_s.zkp.s, DL_P);
-  auto pk_to_sigma = CryptoPP::ModularExponentiation(pki, sigma, DL_P);
-  auto v_times_pk_to_sigma = a_times_b_mod_c(a2w_dec_s.zkp.v, pk_to_sigma, DL_P);
-  auto statement_1 = g_to_s == v_times_pk_to_sigma;
+  auto pk_to_c = CryptoPP::ModularExponentiation(pki, c, DL_P);
+  auto v_times_pk_to_c = a_times_b_mod_c(a2w_dec_s.zkp.v, pk_to_c, DL_P);
+  auto statement_1 = g_to_s == v_times_pk_to_c;
 
+  // Verify that a^s = u * d^(sigma) (mod p)
   auto a_to_s = CryptoPP::ModularExponentiation(a2w_dec_s.dec.aggregate_ciphertext.a, a2w_dec_s.zkp.s, DL_P);
-  auto d_to_sigma = CryptoPP::ModularExponentiation(a2w_dec_s.dec.d, sigma, DL_P);
-  auto u_times_d_to_sigma = a_times_b_mod_c(a2w_dec_s.zkp.u, d_to_sigma, DL_P);
-  auto statement_2 = a_to_s == u_times_d_to_sigma;
+  auto d_to_c = CryptoPP::ModularExponentiation(a2w_dec_s.dec.d, c, DL_P);
+  auto u_times_d_to_c = a_times_b_mod_c(a2w_dec_s.zkp.u, d_to_c, DL_P);
+  auto statement_2 = a_to_s == u_times_d_to_c;
 
   if (statement_1 && statement_2) {
     return true;
