@@ -172,12 +172,13 @@ void VoterClient::HandleRegister(std::string input) {
   auto [aes_key, hmac_key] = HandleKeyExchange(this->RSA_registrar_verification_key);
   
   // Encrypt raw vote and send a ZKP for it through ElectionClient::GenerateVote
-  auto [encrypted_vote, vote_zkp] = ElectionClient::GenerateVote(raw_vote, EG_arbiter_public_key);
+  auto [encrypted_vote, vote_zkp] = ElectionClient::GenerateVote(raw_vote, this->EG_arbiter_public_key);
   
   // Blind the vote and send it to the registrar
   VoterToRegistrar_Register_Message vote_msg;
   auto [blinded_vote, blinding_factor] = this->crypto_driver->RSA_BLIND_blind(this->RSA_registrar_verification_key, encrypted_vote);
   vote_msg.vote = blinded_vote;
+  vote_msg.id = this->voter_config.voter_id;
   auto vote_msg_bytes = crypto_driver->encrypt_and_tag(aes_key, hmac_key, &vote_msg);
   network_driver->send(vote_msg_bytes);
   
@@ -189,23 +190,14 @@ void VoterClient::HandleRegister(std::string input) {
     throw std::runtime_error("Could not decrypt message");
   }
   reg_to_voter_blind_sig_msg.deserialize(decrypted_blind_sig_msg_data);
-  
-  // Receive the signature from the server
-  std::vector<unsigned char> dh_pub_msg_data = network_driver->read();
-  ServerToUser_DHPublicValue_Message dh_pub_msg;
-  auto [decrypted_dh_pub_msg, dh_pub_msg_decrypted] = crypto_driver->decrypt_and_verify(aes_key, hmac_key, dh_pub_msg_data);
-  if (!dh_pub_msg_decrypted) {
-    throw std::runtime_error("Could not decrypt message");
-  }
-  dh_pub_msg.deserialize(decrypted_dh_pub_msg);
 
   // Save the ElGamal encrypted vote, ZKP, registrar signature, and blind to both memory and disk
   this->vote = encrypted_vote;
   this->vote_zkp = vote_zkp;
   this->registrar_signature = reg_to_voter_blind_sig_msg.registrar_signature;
   this->blind = blinding_factor;
-  SaveVote(this->voter_config.voter_vote_path, encrypted_vote);
-  SaveVoteZKP(this->voter_config.voter_vote_zkp_path, vote_zkp);
+  SaveVote(this->voter_config.voter_vote_path, this->vote);
+  SaveVoteZKP(this->voter_config.voter_vote_zkp_path, this->vote_zkp);
   SaveInteger(this->voter_config.voter_registrar_signature_path,
               reg_to_voter_blind_sig_msg.registrar_signature);
   SaveInteger(this->voter_config.voter_blind_path, blind);

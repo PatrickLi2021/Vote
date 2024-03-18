@@ -68,7 +68,7 @@ void ArbiterClient::run() {
   // Start REPL
   REPLDriver<ArbiterClient> repl = REPLDriver<ArbiterClient>(this);
   repl.add_action("keygen", "keygen", &ArbiterClient::HandleKeygen);
-  // this->cli_driver->print_left("")
+  this->cli_driver->print_left("inside arbiter client run");
   repl.add_action("adjudicate", "adjudicate", &ArbiterClient::HandleAdjudicate);
   repl.run();
 }
@@ -84,11 +84,15 @@ void ArbiterClient::HandleKeygen(std::string _) {
 
   // Save keys
   SaveInteger(this->arbiter_config.arbiter_secret_key_path, keys.first);
+  this->cli_driver->print_left("1");
   SaveInteger(this->arbiter_config.arbiter_public_key_path, keys.second);
+  this->cli_driver->print_left("2");
   LoadInteger(arbiter_config.arbiter_secret_key_path,
               this->EG_arbiter_secret_key);
+  this->cli_driver->print_left("3");
   LoadInteger(arbiter_config.arbiter_public_key_path,
               this->EG_arbiter_public_key_i);
+  this->cli_driver->print_left("4");
   LoadElectionPublicKey(common_config.arbiter_public_key_paths,
                         this->EG_arbiter_public_key);
   this->cli_driver->print_success("Keys succesfully generated and saved!");

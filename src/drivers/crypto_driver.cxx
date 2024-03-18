@@ -225,7 +225,7 @@ bool CryptoDriver::HMAC_verify(SecByteBlock key, std::string ciphertext,
  */
 std::pair<CryptoPP::Integer, CryptoPP::Integer> CryptoDriver::EG_generate() {
   CryptoPP::AutoSeededRandomPool rng;
-  CryptoPP::Integer private_key(rng, 1, DL_Q - 1);
+  CryptoPP::Integer private_key(rng, 2, DL_Q - 1);
   // sample from zp for anything in the exponent and zq for anything in the group
   auto public_key = CryptoPP::ModularExponentiation(DL_G, private_key, DL_P);
   return std::make_pair(private_key, public_key);
