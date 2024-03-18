@@ -1,6 +1,7 @@
 {
   "python.analysis.typeCheckingMode": "basic",
   "files.associations": {
+    "*.js": "javascriptreact",
     "vector": "cpp",
     "cstdlib": "cpp",
     "cstring": "cpp",
@@ -73,6 +74,20 @@
     "thread": "cpp",
     "unordered_map": "cpp",
     "algorithm": "cpp",
-    "utility": "cpp"
+    "utility": "cpp",
+    "strstream": "cpp",
+    "bit": "cpp",
+    "*.tcc": "cpp",
+    "codecvt": "cpp",
+    "unordered_set": "cpp",
+    "functional": "cpp",
+    "iterator": "cpp",
+    "memory_resource": "cpp",
+    "numeric": "cpp",
+    "random": "cpp",
+    "future": "cpp",
+    "cfenv": "cpp",
+    "cinttypes": "cpp",
+    "typeindex": "cpp"
   }
 }

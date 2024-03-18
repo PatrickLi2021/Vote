@@ -224,7 +224,11 @@ bool CryptoDriver::HMAC_verify(SecByteBlock key, std::string ciphertext,
  *    then return (private key, public key)
  */
 std::pair<CryptoPP::Integer, CryptoPP::Integer> CryptoDriver::EG_generate() {
-  // TODO: implement me!
+  CryptoPP::AutoSeededRandomPool rng;
+  CryptoPP::Integer private_key(rng, 1, DL_Q - 1);
+  // sample from zp for anything in the exponent and zq for anything in the group
+  auto public_key = CryptoPP::ModularExponentiation(DL_G, private_key, DL_P);
+  return std::make_pair(private_key, public_key);
 }
 
 /**
@@ -232,7 +236,16 @@ std::pair<CryptoPP::Integer, CryptoPP::Integer> CryptoDriver::EG_generate() {
  * Suitable for both normal RSA signatures and RSA blind signatures.
  */
 std::pair<RSA::PrivateKey, RSA::PublicKey> CryptoDriver::RSA_generate_keys() {
-  // TODO: implement me!
+  CryptoPP::AutoSeededRandomPool prng;
+  RSA::PrivateKey private_key;
+  private_key.GenerateRandomWithKeySize(prng, RSA_KEYSIZE);
+  RSA::PublicKey public_key(private_key);
+  
+  if (!private_key.Validate(prng, 3)) {
+    throw std::runtime_error("Private key validation failed");
+  } else {
+    return std::make_pair(private_key, public_key);
+  }
 }
 
 /**
@@ -240,7 +253,16 @@ std::pair<RSA::PrivateKey, RSA::PublicKey> CryptoDriver::RSA_generate_keys() {
  */
 std::string CryptoDriver::RSA_sign(const RSA::PrivateKey &signing_key,
                                    std::vector<unsigned char> message) {
-  // TODO: implement me!
+  CryptoPP::AutoSeededRandomPool rng;
+  RSASS<PSS, SHA256>::Signer signer(signing_key);
+  auto message_str = chvec2str(message);
+  std::string signature;
+  CryptoPP::StringSource ss1(message_str, true, 
+    new SignerFilter(rng, signer,
+        new StringSink(signature)
+    ) 
+  ); 
+  return signature;
 }
 
 /**
@@ -251,7 +273,21 @@ bool CryptoDriver::RSA_verify(const RSA::PublicKey &verification_key,
                               std::string signature) {
   const int flags = SignatureVerificationFilter::PUT_RESULT |
                     SignatureVerificationFilter::SIGNATURE_AT_END;
-  // TODO: implement me!
+  RSASS<PSS, SHA256>::Verifier verifier(verification_key);
+  auto message_str = chvec2str(message);
+  std::string recovered;
+  byte result = false;
+
+  StringSource ss(message_str + signature, true,
+    new SignatureVerificationFilter(
+        verifier,
+        new ArraySink(
+            &result, sizeof(result)),
+            flags
+    )
+  );
+  return result;
+  
 }
 
 /**
@@ -284,7 +320,14 @@ CryptoDriver::RSA_BLIND_blind(const RSA::PublicKey &public_key,
   // 2) Compute the blinded message mm = (hm * r^e) % n
   // 3) Return the blinded message and the blinding factor r
   // See https://www.cryptopp.com/wiki/Blind_Signature for reference
-  // TODO: implement me!
+
+  Integer r;
+    do {
+        r.Randomize(prng, Integer::One(), n - Integer::One());
+    } while (!RelativelyPrime(r, n));
+    CryptoPP::Integer blinding_factor = a_exp_b_mod_c(r, e, n);
+    CryptoPP::Integer blinded_message = a_times_b_mod_c(hm, blinding_factor, n);
+    return std::make_pair(blinded_message, blinding_factor);
 }
 
 /**
@@ -293,7 +336,8 @@ CryptoDriver::RSA_BLIND_blind(const RSA::PublicKey &public_key,
 CryptoPP::Integer
 CryptoDriver::RSA_BLIND_sign(const RSA::PrivateKey &private_key,
                              CryptoPP::Integer blinded_msg) {
-  // TODO: implement me!
+  CryptoPP::AutoSeededRandomPool rng;
+  return private_key.CalculateInverse(rng, blinded_msg);
 }
 
 /**
@@ -303,7 +347,8 @@ CryptoPP::Integer
 CryptoDriver::RSA_BLIND_unblind(const RSA::PublicKey &public_key,
                                 CryptoPP::Integer signed_blind_msg,
                                 CryptoPP::Integer blind) {
-  // TODO: implement me!
+  auto n = public_key.GetModulus();
+  return a_times_b_mod_c(signed_blind_msg, blind.InverseMod(n), n);
 }
 
 /**
@@ -334,7 +379,24 @@ bool CryptoDriver::RSA_BLIND_verify(const RSA::PublicKey &public_key,
   // in documentation, or as the function "ApplyFunction" in the
   // CryptoPP wiki.
   // 2) Compare the result to the hash of the message `hm` and return
-  // TODO: implement me!
+
+  SecByteBlock buff2, buff3;
+
+  auto verification = public_key.ApplyFunction(signature);
+  size_t req = verification.MinEncodedSize();
+  buff2.resize(req);
+  verification.Encode(&buff2[0], buff2.size());
+
+  // Hash message
+  buff3.resize(SIG_SIZE);
+  SHA256 hash2;
+  hash2.CalculateTruncatedDigest(buff3, buff3.size(), msg_block, msg_block.size());
+
+  // Constant time compare
+  bool equal = buff2.size() == buff3.size() && VerifyBufsEqual(buff2.data(), buff3.data(), buff3.size());
+  if (!equal)
+      throw std::runtime_error("Eve verified failed");
+  return 0;
 }
 
 /**

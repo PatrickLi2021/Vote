@@ -153,8 +153,38 @@ TallyerClient::HandleKeyExchange(std::shared_ptr<NetworkDriver> network_driver,
  */
 void TallyerClient::HandleTally(std::shared_ptr<NetworkDriver> network_driver,
                                 std::shared_ptr<CryptoDriver> crypto_driver) {
-  // TODO: implement me!
-  // --------------------------------
-  // Exit cleanly.
+  // Handle key exchange
+  auto [aes_key, hmac_key] = HandleKeyExchange(network_driver, crypto_driver);
+
+  // Receives a vote from the user
+  std::vector<unsigned char> vote_msg_data = network_driver->read();
+  VoterToTallyer_Vote_Message vote_msg;
+  auto [decrypted_vote_msg, vote_msg_decrypted] = crypto_driver->decrypt_and_verify(aes_key, hmac_key, vote_msg_data);
+  if (!vote_msg_decrypted) {
+    throw std::runtime_error("Could not decrypt message");
+  }
+  vote_msg.deserialize(decrypted_vote_msg);
+
+  // Makes sure the user hasn't voted yet
+  bool user_voted = this->db_driver->vote_exists(vote_msg.vote);
+  if (user_voted) {
+    throw std::runtime_error("User has already voted");
+  }
+
+  // Verifies the server's signature and ZKP
+  bool sig_verified = crypto_driver->RSA_BLIND_verify(this->RSA_tallyer_signing_key, vote_msg, vote_msg.unblinded_signature);
+  bool vote_zkp_verified = ElectionClient::VerifyVoteZKP(std::make_pair(vote_msg.vote, vote_msg.zkp), this->EG_arbiter_public_key);
+  if (!sig_verified || !vote_zkp_verified) {
+    throw std::runtime_error("Could not verify either the server's signature or vote ZKP");
+  }
+  // Signs vote and publishes it to the database (marking user as already voted)
+  auto blind_sig = crypto_driver->RSA_sign(this->RSA_tallyer_signing_key, concat_vote_zkp_and_signature(vote_msg.vote, vote_msg.zkp, vote_msg.unblinded_signature));
+  TallyerToWorld_Vote_Message tallyer_to_world_vote_msg;
+  tallyer_to_world_vote_msg.vote = vote_msg.vote;
+  tallyer_to_world_vote_msg.zkp = vote_msg.zkp;
+  tallyer_to_world_vote_msg.unblinded_signature = vote_msg.unblinded_signature;
+  tallyer_to_world_vote_msg.tallyer_signature = blind_sig;
+  VoteRow inserted_vote = this->db_driver->insert_vote(tallyer_to_world_vote_msg);
+  
   network_driver->disconnect();
 }

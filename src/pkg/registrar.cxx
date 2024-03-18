@@ -150,8 +150,45 @@ RegistrarClient::HandleKeyExchange(
 void RegistrarClient::HandleRegister(
     std::shared_ptr<NetworkDriver> network_driver,
     std::shared_ptr<CryptoDriver> crypto_driver) {
-  // TODO: implement me!
-  // --------------------------------
-  // Exit cleanly
+  // Handle key exchange
+  auto [aes_key, hmac_key] = HandleKeyExchange(network_driver, crypto_driver);
+  
+  // Get user info
+  std::vector<unsigned char> user_info = network_driver->read();
+  VoterToRegistrar_Register_Message user_info_msg;
+  auto [decrypted_user_info_msg, user_info_msg_decrypted] = crypto_driver->decrypt_and_verify(aes_key, hmac_key, user_info);
+  if (!user_info_msg_decrypted) {
+    throw std::runtime_error("Could not decrypt message");
+  }
+  user_info_msg.deserialize(decrypted_user_info_msg);
+  
+  // Check if the user has registered before
+  VoterRow found_voter = this->db_driver->find_voter(user_info_msg.id);
+  bool registered;
+  if (found_voter.id == "") {
+    registered = false;
+  }
+
+  // If user has not yet registered, send back existing signature
+  if (registered) {
+    RegistrarToVoter_Blind_Signature_Message blind_sig_msg;
+    blind_sig_msg.registrar_signature = found_voter.registrar_signature;
+    auto blind_sig_msg_bytes = crypto_driver->encrypt_and_tag(aes_key, hmac_key, &blind_sig_msg);
+    network_driver->send(blind_sig_msg_bytes);
+  }
+  // Otherwise, sign user's message and send it back
+  else {
+    auto blind_signature = crypto_driver->RSA_BLIND_sign(this->RSA_registrar_signing_key, user_info_msg.vote);
+    RegistrarToVoter_Blind_Signature_Message blind_sig_msg;
+    blind_sig_msg.registrar_signature = blind_signature;
+    auto blind_sig_msg_bytes = crypto_driver->encrypt_and_tag(aes_key, hmac_key, &blind_sig_msg);
+    network_driver->send(blind_sig_msg_bytes);
+    
+    // Add new user to the database
+    VoterRow new_voter;
+    new_voter.id = user_info_msg.id;
+    new_voter.registrar_signature = blind_signature;
+    this->db_driver->insert_voter(new_voter);
+  }
   network_driver->disconnect();
 }
