@@ -294,7 +294,7 @@ std::tuple<CryptoPP::Integer, CryptoPP::Integer, bool> VoterClient::DoVerify() {
     auto tallyer_sig = all_votes[i].tallyer_signature;
     bool vote_zkp_verified = ElectionClient::VerifyVoteZKP(std::make_pair(current_vote, vote_zkp), this->EG_arbiter_public_key);
     bool blind_verified = this->crypto_driver->RSA_BLIND_verify(this->RSA_registrar_verification_key, this->vote, this->registrar_signature);
-    bool tallyer_sig_verified = this->crypto_driver->RSA_verify(this->RSA_tallyer_verification_key, concat_vote_zkp_and_signature(current_vote, unblinded_sig), tallyer_sig);
+    bool tallyer_sig_verified = this->crypto_driver->RSA_verify(this->RSA_tallyer_verification_key, concat_vote_zkp_and_signature(current_vote, vote_zkp, unblinded_sig), tallyer_sig);
     
     // If the vote is valid, add it to a vector
     if (vote_zkp_verified && blind_verified && tallyer_sig_verified) {
