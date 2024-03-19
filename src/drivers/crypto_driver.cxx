@@ -327,7 +327,7 @@ CryptoDriver::RSA_BLIND_blind(const RSA::PublicKey &public_key,
     } while (!RelativelyPrime(r, n));
     CryptoPP::Integer blinding_factor = a_exp_b_mod_c(r, e, n);
     CryptoPP::Integer blinded_message = a_times_b_mod_c(hm, blinding_factor, n);
-    return std::make_pair(blinded_message, blinding_factor);
+    return std::make_pair(blinded_message, r);
 }
 
 /**
