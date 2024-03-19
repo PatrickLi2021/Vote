@@ -125,14 +125,12 @@ void ArbiterClient::HandleAdjudicate(std::string _) {
       valid_votes.push_back(current_vote);
     }
   }
-  this->cli_driver->print_left("osihmen");
   // Combine all valid votes into one vote
   Vote_Ciphertext combined_vote = ElectionClient::CombineVotes(valid_votes);
   // Partially decrypt the combined vote
   auto [partial_decryption, decryption_zkp_struct] = ElectionClient::PartialDecrypt(combined_vote, this->EG_arbiter_public_key, this->EG_arbiter_secret_key);
   
   // Publishes the decryption and ZKP to the database
-  this->cli_driver->print_left("Markkanen");
   ArbiterToWorld_PartialDecryption_Message partial_decryption_msg;
   partial_decryption_msg.dec = partial_decryption;
   partial_decryption_msg.zkp = decryption_zkp_struct;
