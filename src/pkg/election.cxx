@@ -49,7 +49,7 @@ ElectionClient::GenerateVote(CryptoPP::Integer vote, CryptoPP::Integer pk) {
 
     // Calculate a1 = g^r1" / a^sigma1 (mod p)
     auto g_to_r1 = CryptoPP::ModularExponentiation(DL_G, vote_zkp.r1, DL_P);
-    auto a_to_sigma1_inverse = CryptoPP::EuclideanMultiplicativeInverse(CryptoPP::ModularExponentiation(vote_cipher.a, sigma_1, DL_P), DL_P);
+    auto a_to_sigma1_inverse = CryptoPP::EuclideanMultiplicativeInverse(CryptoPP::ModularExponentiation(vote_cipher.a, vote_zkp.c1, DL_P), DL_P);
     vote_zkp.a1 = a_times_b_mod_c(g_to_r1, a_to_sigma1_inverse, DL_P);
     
     // Calculate b1 = pk^(r1") / (b')^c1 (mod p)
@@ -67,7 +67,7 @@ ElectionClient::GenerateVote(CryptoPP::Integer vote, CryptoPP::Integer pk) {
     // Calculate sigma0 or c0 = sigma1 - sigma (mod q)
     vote_zkp.c0 = (sigma - vote_zkp.c1) % DL_Q;
     // Calculate r0" = r'0 + c0 * r (mod q)
-    vote_zkp.r0 = r0 + a_times_b_mod_c(vote_zkp.c0, r, DL_Q);
+    vote_zkp.r0 = r_prime_0 + a_times_b_mod_c(vote_zkp.c0, r, DL_Q);
   }
   else {
     // Compute and set c0 and r0
