@@ -173,7 +173,7 @@ void TallyerClient::HandleTally(std::shared_ptr<NetworkDriver> network_driver,
   }
   else {
     // Verifies the server's signature and ZKP
-    bool sig_verified = crypto_driver->RSA_BLIND_verify(this->RSA_tallyer_verification_key, vote_msg.vote, vote_msg.unblinded_signature);
+    bool sig_verified = crypto_driver->RSA_BLIND_verify(this->RSA_registrar_verification_key, vote_msg.vote, vote_msg.unblinded_signature);
     bool vote_zkp_verified = ElectionClient::VerifyVoteZKP(std::make_pair(vote_msg.vote, vote_msg.zkp), this->EG_arbiter_public_key);
     if (!sig_verified) {
       throw std::runtime_error("Could not verify the server's signature");
