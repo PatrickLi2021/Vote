@@ -217,8 +217,8 @@ Vote_Ciphertext ElectionClient::CombineVotes(std::vector<VoteRow> all_votes) {
   
   // Multiply each c1 with each other
   for (int i = 0; i < all_votes.size(); ++i) {
-    c1_product *= a_times_b_mod_c(all_votes[i].vote.a, c1_product, DL_P);
-    c2_product *= a_times_b_mod_c(all_votes[i].vote.b, c2_product, DL_P);
+    c1_product = a_times_b_mod_c(all_votes[i].vote.a, c1_product, DL_P);
+    c2_product = a_times_b_mod_c(all_votes[i].vote.b, c2_product, DL_P);
   }
   vote_cipher.a = c1_product;
   vote_cipher.b = c2_product;
