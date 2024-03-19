@@ -232,19 +232,19 @@ void VoterClient::HandleVote(std::string input) {
 
   // Handles key exchange
   auto [aes_key, hmac_key] = HandleKeyExchange(this->RSA_tallyer_verification_key);
-  this->cli_driver->print_left("Haaland");
+  this->cli_driver->print_left("Finished HandleKeyExchange");
   // Unblinds the registrar signature that is stored in this->registrar_signature
   auto unblinded_sig = this->crypto_driver->RSA_BLIND_unblind(this->RSA_tallyer_verification_key, this->registrar_signature, this->blind);
-  this->cli_driver->print_left("Koke");
+  this->cli_driver->print_left("finished RSA_BLIND_unblind");
   // Sends the vote, ZKP, and unblinded signature to the tallyer.
   VoterToTallyer_Vote_Message voter_to_tallyer_msg;
   voter_to_tallyer_msg.unblinded_signature = unblinded_sig;
-  this->cli_driver->print_left("Odegaard");
+  this->cli_driver->print_left("about to send the message");
   voter_to_tallyer_msg.vote = this->vote;
   voter_to_tallyer_msg.zkp = this->vote_zkp;
   auto voter_to_tallyer_msg_bytes = crypto_driver->encrypt_and_tag(aes_key, hmac_key, &voter_to_tallyer_msg);
   network_driver->send(voter_to_tallyer_msg_bytes);
-  this->cli_driver->print_left("Mbappe");
+  this->cli_driver->print_left("finished sending the message");
 
   // Exit cleanly.
   this->network_driver->disconnect();
@@ -263,14 +263,12 @@ void VoterClient::HandleVerify(std::string input) {
     this->cli_driver->print_warning("Election failed!");
     throw std::runtime_error("Election failed!");
   }
-  this->cli_driver->print_left("Silva");
   // Print results
   this->cli_driver->print_success("Election succeeded!");
   this->cli_driver->print_success("Number of votes for 0: " +
                                   CryptoPP::IntToString(std::get<0>(result)));
   this->cli_driver->print_success("Number of votes for 1: " +
                                   CryptoPP::IntToString(std::get<1>(result)));
-  this->cli_driver->print_left("bayern");
 }
 
 /**
@@ -307,7 +305,7 @@ std::tuple<CryptoPP::Integer, CryptoPP::Integer, bool> VoterClient::DoVerify() {
     auto current_partial_decryption_zkp = all_partial_decryption_ZKPs[i];
     CryptoPP::Integer pki;
     LoadInteger(current_partial_decryption_zkp.arbiter_vk_path, pki);
-    this->cli_driver->print_left("Musiala");
+    this->cli_driver->print_left("loaded pki");
     bool partial_decrypt_zkp_verified = ElectionClient::VerifyPartialDecryptZKP(current_partial_decryption_zkp, pki);
     if (!partial_decrypt_zkp_verified) {
       throw std::runtime_error("Partial decryption ZKP was invalid");
@@ -317,12 +315,12 @@ std::tuple<CryptoPP::Integer, CryptoPP::Integer, bool> VoterClient::DoVerify() {
       valid_partial_decryptions.push_back(current_partial_decryption_zkp);
     }
   } 
-  this->cli_driver->print_left("Kane");
+  this->cli_driver->print_left("end of for loop");
 
   // Combines partial decryptions to retrieve final result
   auto combined_vote = ElectionClient::CombineVotes(valid_votes);
   auto m = ElectionClient::CombineResults(combined_vote, valid_partial_decryptions);
-  this->cli_driver->print_left("Yamal");
+  this->cli_driver->print_left("finished calling combineresults");
   CryptoPP::Integer num_one_votes = m;
   CryptoPP::Integer num_zero_votes = valid_votes.size() - num_one_votes;
   return std::make_tuple(num_zero_votes, num_one_votes, true);
