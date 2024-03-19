@@ -156,64 +156,63 @@ VoterClient::HandleKeyExchange(CryptoPP::RSA::PublicKey verification_key) {
  * 3) Receives and saves the signature from the server.
  */
 void VoterClient::HandleRegister(std::string input) {
-  // // Parse input and connect to registrar
-  // std::vector<std::string> args = string_split(input, ' ');
-  // if (args.size() != 4) {
-  //   this->cli_driver->print_warning("usage: register <address> <port> <vote>");
-  //   return;
-  // }
-  // this->network_driver->connect(args[1], std::stoi(args[2]));
+  // Parse input and connect to registrar
+  std::vector<std::string> args = string_split(input, ' ');
+  if (args.size() != 4) {
+    this->cli_driver->print_warning("usage: register <address> <port> <vote>");
+    return;
+  }
+  this->network_driver->connect(args[1], std::stoi(args[2]));
 
-  // // Load some info from config into variables
-  // std::string voter_id = this->voter_config.voter_id;
-  // CryptoPP::Integer raw_vote = CryptoPP::Integer(std::stoi(args[3]));
+  // Load some info from config into variables
+  std::string voter_id = this->voter_config.voter_id;
+  CryptoPP::Integer raw_vote = CryptoPP::Integer(std::stoi(args[3]));
   
-  // // Handle key exchange with the registrar
-  // auto [aes_key, hmac_key] = HandleKeyExchange(this->RSA_registrar_verification_key);
+  // Handle key exchange with the registrar
+  auto [aes_key, hmac_key] = HandleKeyExchange(this->RSA_registrar_verification_key);
   
-  // // Encrypt raw vote and send a ZKP for it through ElectionClient::GenerateVote
-  // this->cli_driver->print_left("about to generatevote");
-  // auto [encrypted_vote, vote_zkp] = ElectionClient::GenerateVote(raw_vote, this->EG_arbiter_public_key);
-  // this->cli_driver->print_left("just finished generatevote");
+  // Encrypt raw vote and send a ZKP for it through ElectionClient::GenerateVote
+  this->cli_driver->print_left("about to generatevote");
+  auto [encrypted_vote, vote_zkp] = ElectionClient::GenerateVote(raw_vote, this->EG_arbiter_public_key);
+  this->cli_driver->print_left("just finished generatevote");
 
-  // // Blind the vote and send it to the registrar
-  // VoterToRegistrar_Register_Message vote_msg;
-  // this->cli_driver->print_left("about to rsablin blind");
-  // auto [blinded_vote, blinding_factor] = this->crypto_driver->RSA_BLIND_blind(this->RSA_registrar_verification_key, encrypted_vote);
-  // vote_msg.vote = blinded_vote;
-  // vote_msg.id = this->voter_config.voter_id;
-  // auto vote_msg_bytes = crypto_driver->encrypt_and_tag(aes_key, hmac_key, &vote_msg);
-  // network_driver->send(vote_msg_bytes);
-  // this->cli_driver->print_left("finished sending and rsa blind blind");
+  // Blind the vote and send it to the registrar
+  VoterToRegistrar_Register_Message vote_msg;
+  this->cli_driver->print_left("about to rsablin blind");
+  auto [blinded_vote, blinding_factor] = this->crypto_driver->RSA_BLIND_blind(this->RSA_registrar_verification_key, encrypted_vote);
+  vote_msg.vote = blinded_vote;
+  vote_msg.id = this->voter_config.voter_id;
+  auto vote_msg_bytes = crypto_driver->encrypt_and_tag(aes_key, hmac_key, &vote_msg);
+  network_driver->send(vote_msg_bytes);
+  this->cli_driver->print_left("finished sending and rsa blind blind");
   
-  // // Receive the blind signature from the registrar
-  // this->cli_driver->print_left("receive blind signature from registrar");
-  // std::vector<unsigned char> reg_to_voter_blind_sig_data = network_driver->read();
-  // RegistrarToVoter_Blind_Signature_Message reg_to_voter_blind_sig_msg;
-  // auto [decrypted_blind_sig_msg_data, blind_sig_msg_decrypted] = crypto_driver->decrypt_and_verify(aes_key, hmac_key, reg_to_voter_blind_sig_data);
-  // if (!blind_sig_msg_decrypted) {
-  //   throw std::runtime_error("Could not decrypt message");
-  // }
-  // reg_to_voter_blind_sig_msg.deserialize(decrypted_blind_sig_msg_data);
-  // this->cli_driver->print_left("finished doing that");
+  // Receive the blind signature from the registrar
+  this->cli_driver->print_left("receive blind signature from registrar");
+  std::vector<unsigned char> reg_to_voter_blind_sig_data = network_driver->read();
+  RegistrarToVoter_Blind_Signature_Message reg_to_voter_blind_sig_msg;
+  auto [decrypted_blind_sig_msg_data, blind_sig_msg_decrypted] = crypto_driver->decrypt_and_verify(aes_key, hmac_key, reg_to_voter_blind_sig_data);
+  if (!blind_sig_msg_decrypted) {
+    throw std::runtime_error("Could not decrypt message");
+  }
+  reg_to_voter_blind_sig_msg.deserialize(decrypted_blind_sig_msg_data);
+  this->cli_driver->print_left("finished doing that");
 
-  // // Save the ElGamal encrypted vote, ZKP, registrar signature, and blind to both memory and disk
-  // this->cli_driver->print_left("saving everything");
-  // this->vote = encrypted_vote;
-  // this->vote_zkp = vote_zkp;
-  // this->registrar_signature = reg_to_voter_blind_sig_msg.registrar_signature;
-  // this->blind = blinding_factor;
-  // SaveVote(this->voter_config.voter_vote_path, this->vote);
-  // SaveVoteZKP(this->voter_config.voter_vote_zkp_path, this->vote_zkp);
-  // SaveInteger(this->voter_config.voter_registrar_signature_path,
-  //             reg_to_voter_blind_sig_msg.registrar_signature);
-  // SaveInteger(this->voter_config.voter_blind_path, blind);
+  // Save the ElGamal encrypted vote, ZKP, registrar signature, and blind to both memory and disk
+  this->cli_driver->print_left("saving everything");
+  this->vote = encrypted_vote;
+  this->vote_zkp = vote_zkp;
+  this->registrar_signature = reg_to_voter_blind_sig_msg.registrar_signature;
+  this->blind = blinding_factor;
+  SaveVote(this->voter_config.voter_vote_path, this->vote);
+  SaveVoteZKP(this->voter_config.voter_vote_zkp_path, this->vote_zkp);
+  SaveInteger(this->voter_config.voter_registrar_signature_path,
+              reg_to_voter_blind_sig_msg.registrar_signature);
+  SaveInteger(this->voter_config.voter_blind_path, blind);
 
-  // this->cli_driver->print_info(
-  //     "Voter registered! Vote saved at " + this->voter_config.voter_vote_path +
-  //     " and vote zkp saved at " + this->voter_config.voter_vote_zkp_path);
-  // this->network_driver->disconnect();
-  return;
+  this->cli_driver->print_info(
+      "Voter registered! Vote saved at " + this->voter_config.voter_vote_path +
+      " and vote zkp saved at " + this->voter_config.voter_vote_zkp_path);
+  this->network_driver->disconnect();
 }
 
 /**
@@ -223,33 +222,32 @@ void VoterClient::HandleRegister(std::string input) {
  * 3) Sends the vote, ZKP, and unblinded signature to the tallyer.
  */
 void VoterClient::HandleVote(std::string input) {
-  // // Parse input and connect to tallyer
-  // std::vector<std::string> args = string_split(input, ' ');
-  // if (args.size() != 3) {
-  //   this->cli_driver->print_warning("usage: vote <address> <port>");
-  //   return;
-  // }
-  // this->network_driver->connect(args[1], std::stoi(args[2]));
+  // Parse input and connect to tallyer
+  std::vector<std::string> args = string_split(input, ' ');
+  if (args.size() != 3) {
+    this->cli_driver->print_warning("usage: vote <address> <port>");
+    return;
+  }
+  this->network_driver->connect(args[1], std::stoi(args[2]));
 
-  // // Handles key exchange
-  // auto [aes_key, hmac_key] = HandleKeyExchange(this->RSA_tallyer_verification_key);
-  // this->cli_driver->print_left("Haaland");
-  // // Unblinds the registrar signature that is stored in this->registrar_signature
-  // auto unblinded_sig = this->crypto_driver->RSA_BLIND_unblind(this->RSA_tallyer_verification_key, this->registrar_signature, this->blind);
-  // this->cli_driver->print_left("Koke");
-  // // Sends the vote, ZKP, and unblinded signature to the tallyer.
-  // VoterToTallyer_Vote_Message voter_to_tallyer_msg;
-  // voter_to_tallyer_msg.unblinded_signature = unblinded_sig;
-  // this->cli_driver->print_left("Odegaard");
-  // voter_to_tallyer_msg.vote = this->vote;
-  // voter_to_tallyer_msg.zkp = this->vote_zkp;
-  // auto voter_to_tallyer_msg_bytes = crypto_driver->encrypt_and_tag(aes_key, hmac_key, &voter_to_tallyer_msg);
-  // network_driver->send(voter_to_tallyer_msg_bytes);
-  // this->cli_driver->print_left("Mbappe");
+  // Handles key exchange
+  auto [aes_key, hmac_key] = HandleKeyExchange(this->RSA_tallyer_verification_key);
+  this->cli_driver->print_left("Haaland");
+  // Unblinds the registrar signature that is stored in this->registrar_signature
+  auto unblinded_sig = this->crypto_driver->RSA_BLIND_unblind(this->RSA_tallyer_verification_key, this->registrar_signature, this->blind);
+  this->cli_driver->print_left("Koke");
+  // Sends the vote, ZKP, and unblinded signature to the tallyer.
+  VoterToTallyer_Vote_Message voter_to_tallyer_msg;
+  voter_to_tallyer_msg.unblinded_signature = unblinded_sig;
+  this->cli_driver->print_left("Odegaard");
+  voter_to_tallyer_msg.vote = this->vote;
+  voter_to_tallyer_msg.zkp = this->vote_zkp;
+  auto voter_to_tallyer_msg_bytes = crypto_driver->encrypt_and_tag(aes_key, hmac_key, &voter_to_tallyer_msg);
+  network_driver->send(voter_to_tallyer_msg_bytes);
+  this->cli_driver->print_left("Mbappe");
 
-  // // Exit cleanly.
-  // this->network_driver->disconnect();
-  return;
+  // Exit cleanly.
+  this->network_driver->disconnect();
 }
 
 /**
@@ -284,52 +282,48 @@ void VoterClient::HandleVerify(std::string input) {
  * If a vote is invalid, simply ignore it: do not throw an error.
  */
 std::tuple<CryptoPP::Integer, CryptoPP::Integer, bool> VoterClient::DoVerify() {
-  // this->cli_driver->print_left("inside do verify");
-  // // Get a vector of all votes
-  // auto all_votes = this->db_driver->all_votes();
+  this->cli_driver->print_left("inside do verify");
+  // Get a vector of all votes
+  auto all_votes = this->db_driver->all_votes();
   
-  // // Verify all vote ZKPs and their signatures
-  // this->cli_driver->print_left("about to verify all vote zkps and sigs");
-  // std::vector<VoteRow> valid_votes;
-  // for (size_t i = 0; i < all_votes.size(); ++i) {
-  //   auto current_vote = all_votes[i].vote;
-  //   auto vote_zkp = all_votes[i].zkp;
-  //   bool vote_zkp_verified = ElectionClient::VerifyVoteZKP(std::make_pair(current_vote, vote_zkp), this->EG_arbiter_public_key);
+  // Verify all vote ZKPs and their signatures
+  this->cli_driver->print_left("about to verify all vote zkps and sigs");
+  std::vector<VoteRow> valid_votes;
+  for (size_t i = 0; i < all_votes.size(); ++i) {
+    auto current_vote = all_votes[i].vote;
+    auto vote_zkp = all_votes[i].zkp;
+    bool vote_zkp_verified = ElectionClient::VerifyVoteZKP(std::make_pair(current_vote, vote_zkp), this->EG_arbiter_public_key);
     
-  //   // If the vote is valid, add it to a vector
-  //   if (vote_zkp_verified) {
-  //     valid_votes.push_back(all_votes[i]);
-  //   }
-  // }
-  // // Verify all partial decryption ZKPs
-  // this->cli_driver->print_left("about to verify all partial decryption ZKPs");
-  // std::vector<PartialDecryptionRow> valid_partial_decryptions;
-  // auto all_partial_decryption_ZKPs = this->db_driver->all_partial_decryptions();
-  // for (int i = 0; i < all_partial_decryption_ZKPs.size(); ++i) {
-  //   auto current_partial_decryption_zkp = all_partial_decryption_ZKPs[i];
-  //   CryptoPP::Integer pki;
-  //   LoadInteger(current_partial_decryption_zkp.arbiter_vk_path, pki);
-  //   this->cli_driver->print_left("Musiala");
-  //   bool partial_decrypt_zkp_verified = ElectionClient::VerifyPartialDecryptZKP(current_partial_decryption_zkp, pki);
-  //   if (!partial_decrypt_zkp_verified) {
-  //     throw std::runtime_error("Partial decryption ZKP was invalid");
-  //     return std::make_tuple(0, 0, false);
-  //   }
-  //   else {
-  //     valid_partial_decryptions.push_back(current_partial_decryption_zkp);
-  //   }
-  // } 
-  // this->cli_driver->print_left("Kane");
+    // If the vote is valid, add it to a vector
+    if (vote_zkp_verified) {
+      valid_votes.push_back(all_votes[i]);
+    }
+  }
+  // Verify all partial decryption ZKPs
+  this->cli_driver->print_left("about to verify all partial decryption ZKPs");
+  std::vector<PartialDecryptionRow> valid_partial_decryptions;
+  auto all_partial_decryption_ZKPs = this->db_driver->all_partial_decryptions();
+  for (int i = 0; i < all_partial_decryption_ZKPs.size(); ++i) {
+    auto current_partial_decryption_zkp = all_partial_decryption_ZKPs[i];
+    CryptoPP::Integer pki;
+    LoadInteger(current_partial_decryption_zkp.arbiter_vk_path, pki);
+    this->cli_driver->print_left("Musiala");
+    bool partial_decrypt_zkp_verified = ElectionClient::VerifyPartialDecryptZKP(current_partial_decryption_zkp, pki);
+    if (!partial_decrypt_zkp_verified) {
+      throw std::runtime_error("Partial decryption ZKP was invalid");
+      return std::make_tuple(0, 0, false);
+    }
+    else {
+      valid_partial_decryptions.push_back(current_partial_decryption_zkp);
+    }
+  } 
+  this->cli_driver->print_left("Kane");
 
-  // // Combines partial decryptions to retrieve final result
-  // auto combined_vote = ElectionClient::CombineVotes(valid_votes);
-  // auto m = ElectionClient::CombineResults(combined_vote, valid_partial_decryptions);
-  // this->cli_driver->print_left("Yamal");
-  // CryptoPP::Integer num_one_votes = m;
-  // CryptoPP::Integer num_zero_votes = valid_votes.size() - num_one_votes;
-  // return std::make_tuple(num_zero_votes, num_one_votes, true);
-  // this->cli_driver->print_left("Lewandowski");
-  CryptoPP::Integer a = 1;
-  CryptoPP::Integer b = 2;
-  return std::make_tuple(1, 2, false);
+  // Combines partial decryptions to retrieve final result
+  auto combined_vote = ElectionClient::CombineVotes(valid_votes);
+  auto m = ElectionClient::CombineResults(combined_vote, valid_partial_decryptions);
+  this->cli_driver->print_left("Yamal");
+  CryptoPP::Integer num_one_votes = m;
+  CryptoPP::Integer num_zero_votes = valid_votes.size() - num_one_votes;
+  return std::make_tuple(num_zero_votes, num_one_votes, true);
 }
