@@ -128,6 +128,7 @@ bool ElectionClient::VerifyVoteZKP(
   auto statement_3 = pk_to_r_double_prime_0 == b0_times_b_to_c0;
   
   // Verify that pk^(r_1") = b'1 * (b/g^1)^(c1) (mod p)
+  // TODO
   auto pk_to_r_double_prime_1 = CryptoPP::ModularExponentiation(pk, vote_zkp.r1, DL_P);
   auto b_div_g_to_c1 = CryptoPP::ModularExponentiation(a_times_b_mod_c(vote_cipher.b, CryptoPP::EuclideanMultiplicativeInverse(DL_G, DL_P), DL_P), vote_zkp.c1, DL_P);
   auto b1_times_b_div_g_to_c1 = a_times_b_mod_c(vote_zkp.b1, b_div_g_to_c1, DL_P);
@@ -135,7 +136,7 @@ bool ElectionClient::VerifyVoteZKP(
 
   // Verify that sigma0 + sigma1 = sigma (mod q)
   auto hash_value = hash_vote_zkp(pk, vote_cipher.a, vote_cipher.b, vote_zkp.a0, vote_zkp.b0, vote_zkp.a1, vote_zkp.b1) % DL_Q;
-  auto c0_plus_c1 = vote_zkp.c0 + vote_zkp.c1;
+  auto c0_plus_c1 = (vote_zkp.c0 + vote_zkp.c1) % DL_Q;
   auto statement_5 = c0_plus_c1 == hash_value;
   std::cout << "leaving verifyvotezkp";
   if (statement_1 && statement_2 && statement_3 && statement_4 && statement_5) {
@@ -168,7 +169,7 @@ ElectionClient::PartialDecrypt(Vote_Ciphertext combined_vote,
   auto c = hash_dec_zkp(pk, combined_vote.a, combined_vote.b, decryption_zkp.u, decryption_zkp.v);
 
   // Let s := r + c * ski (mod q) and compute decryption factor d := a^ski (mod p)
-  decryption_zkp.s = r + a_times_b_mod_c(c, sk, DL_Q);
+  decryption_zkp.s = (r + a_times_b_mod_c(c, sk, DL_Q)) % DL_Q;
   
   partial_dec.d = CryptoPP::ModularExponentiation(combined_vote.a, sk, DL_P);
   partial_dec.aggregate_ciphertext = combined_vote;
@@ -236,7 +237,7 @@ CryptoPP::Integer ElectionClient::CombineResults(
   CryptoPP::Integer product_c1_ski = 1;
   // Compute c1^(ski)
   for (int i = 0; i < all_partial_decryptions.size(); ++i) {
-    product_c1_ski *= all_partial_decryptions[i].dec.d;
+    product_c1_ski = a_times_b_mod_c(product_c1_ski, all_partial_decryptions[i].dec.d, DL_P);
   }
   // Calculate g^m
   auto g_to_m = a_times_b_mod_c(combined_vote.b, CryptoPP::EuclideanMultiplicativeInverse(product_c1_ski, DL_P), DL_P);
