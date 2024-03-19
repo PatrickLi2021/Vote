@@ -109,32 +109,35 @@ void ArbiterClient::HandleKeygen(std::string _) {
  * 6) Publishes the decryption and zkp to the database.
  */
 void ArbiterClient::HandleAdjudicate(std::string _) {
-  // Ensure we have the most up-to-date election key
-  LoadElectionPublicKey(common_config.arbiter_public_key_paths,
-                        this->EG_arbiter_public_key);
-  
-  // Get all votes from the database
-  auto all_votes = this->db_driver->all_votes();
+  // // Ensure we have the most up-to-date election key
+  // LoadElectionPublicKey(common_config.arbiter_public_key_paths,
+  //                       this->EG_arbiter_public_key);
+  // this->cli_driver->print_left("inside handle adjudicate");
+  // // Get all votes from the database
+  // auto all_votes = this->db_driver->all_votes();
 
-  // Verify all vote ZKPs and their signatures
-  std::vector<VoteRow> valid_votes;
-  for (int i = 0; i < all_votes.size(); ++i) {
-    auto current_vote = all_votes[i];
-    bool vote_zkp_verified = ElectionClient::VerifyVoteZKP(std::make_pair(current_vote.vote, current_vote.zkp), this->EG_arbiter_public_key);
-    if (vote_zkp_verified) {
-      valid_votes.push_back(current_vote);
-    }
-  }
-  // Combine all valid votes into one vote
-  Vote_Ciphertext combined_vote = ElectionClient::CombineVotes(valid_votes);
-  // Partially decrypt the combined vote
-  auto [partial_decryption, decryption_zkp_struct] = ElectionClient::PartialDecrypt(combined_vote, this->EG_arbiter_public_key, this->EG_arbiter_secret_key);
+  // // Verify all vote ZKPs and their signatures
+  // std::vector<VoteRow> valid_votes;
+  // for (int i = 0; i < all_votes.size(); ++i) {
+  //   auto current_vote = all_votes[i];
+  //   bool vote_zkp_verified = ElectionClient::VerifyVoteZKP(std::make_pair(current_vote.vote, current_vote.zkp), this->EG_arbiter_public_key);
+  //   if (vote_zkp_verified) {
+  //     valid_votes.push_back(current_vote);
+  //   }
+  // }
+  // this->cli_driver->print_left("osihmen");
+  // // Combine all valid votes into one vote
+  // Vote_Ciphertext combined_vote = ElectionClient::CombineVotes(valid_votes);
+  // // Partially decrypt the combined vote
+  // auto [partial_decryption, decryption_zkp_struct] = ElectionClient::PartialDecrypt(combined_vote, this->EG_arbiter_public_key, this->EG_arbiter_secret_key);
   
-  // Publishes the decryption and ZKP to the database
-  ArbiterToWorld_PartialDecryption_Message partial_decryption_msg;
-  partial_decryption_msg.dec = partial_decryption;
-  partial_decryption_msg.zkp = decryption_zkp_struct;
-  partial_decryption_msg.arbiter_id = this->arbiter_config.arbiter_id;
-  partial_decryption_msg.arbiter_vk_path = this->arbiter_config.arbiter_public_key_path;
-  PartialDecryptionRow partial_dec_row = this->db_driver->insert_partial_decryption(partial_decryption_msg);
+  // // Publishes the decryption and ZKP to the database
+  // this->cli_driver->print_left("Markkanen");
+  // ArbiterToWorld_PartialDecryption_Message partial_decryption_msg;
+  // partial_decryption_msg.dec = partial_decryption;
+  // partial_decryption_msg.zkp = decryption_zkp_struct;
+  // partial_decryption_msg.arbiter_id = this->arbiter_config.arbiter_id;
+  // partial_decryption_msg.arbiter_vk_path = this->arbiter_config.arbiter_public_key_path;
+  // PartialDecryptionRow partial_dec_row = this->db_driver->insert_partial_decryption(partial_decryption_msg);
+  return void;
 }
