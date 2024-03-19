@@ -234,7 +234,7 @@ void VoterClient::HandleVote(std::string input) {
   auto [aes_key, hmac_key] = HandleKeyExchange(this->RSA_tallyer_verification_key);
   this->cli_driver->print_left("Finished HandleKeyExchange");
   // Unblinds the registrar signature that is stored in this->registrar_signature
-  auto unblinded_sig = this->crypto_driver->RSA_BLIND_unblind(this->RSA_tallyer_verification_key, this->registrar_signature, this->blind);
+  auto unblinded_sig = this->crypto_driver->RSA_BLIND_unblind(this->RSA_registrar_verification_key, this->registrar_signature, this->blind);
   this->cli_driver->print_left("finished RSA_BLIND_unblind");
   // Sends the vote, ZKP, and unblinded signature to the tallyer.
   VoterToTallyer_Vote_Message voter_to_tallyer_msg;
