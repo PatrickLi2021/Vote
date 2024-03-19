@@ -290,13 +290,20 @@ std::tuple<CryptoPP::Integer, CryptoPP::Integer, bool> VoterClient::DoVerify() {
   for (size_t i = 0; i < all_votes.size(); ++i) {
     auto current_vote = all_votes[i].vote;
     auto vote_zkp = all_votes[i].zkp;
+    auto unblinded_sig = all_votes[i].unblinded_signature;
+    auto tallyer_sig = all_votes[i].tallyer_signature;
     bool vote_zkp_verified = ElectionClient::VerifyVoteZKP(std::make_pair(current_vote, vote_zkp), this->EG_arbiter_public_key);
+    bool blind_verified = this->crypto_driver->RSA_BLIND_verify(this->RSA_registrar_verification_key, this->vote, this->registrar_signature);
+    bool tallyer_sig_verified = this->crypto_driver->RSA_verify(this->RSA_tallyer_verification_key, concat_vote_zkp_and_signature(current_vote, unblinded_sig), tallyer_sig);
     
     // If the vote is valid, add it to a vector
-    if (vote_zkp_verified) {
+    if (vote_zkp_verified && blind_verified && tallyer_sig_verified) {
       valid_votes.push_back(all_votes[i]);
     }
   }
+
+  auto combined_vote = ElectionClient::CombineVotes(valid_votes);
+
   // Verify all partial decryption ZKPs
   this->cli_driver->print_left("about to verify all partial decryption ZKPs");
   std::vector<PartialDecryptionRow> valid_partial_decryptions;
@@ -308,18 +315,13 @@ std::tuple<CryptoPP::Integer, CryptoPP::Integer, bool> VoterClient::DoVerify() {
     this->cli_driver->print_left("loaded pki");
     bool partial_decrypt_zkp_verified = ElectionClient::VerifyPartialDecryptZKP(current_partial_decryption_zkp, pki);
     if (!partial_decrypt_zkp_verified) {
-      throw std::runtime_error("Partial decryption ZKP was invalid");
       return std::make_tuple(0, 0, false);
-    }
-    else {
-      valid_partial_decryptions.push_back(current_partial_decryption_zkp);
     }
   } 
   this->cli_driver->print_left("end of for loop");
 
   // Combines partial decryptions to retrieve final result
-  auto combined_vote = ElectionClient::CombineVotes(valid_votes);
-  auto m = ElectionClient::CombineResults(combined_vote, valid_partial_decryptions);
+  auto m = ElectionClient::CombineResults(combined_vote, all_partial_decryptions);
   this->cli_driver->print_left("finished calling combineresults");
   CryptoPP::Integer num_one_votes = m;
   CryptoPP::Integer num_zero_votes = valid_votes.size() - num_one_votes;
