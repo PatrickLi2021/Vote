@@ -331,5 +331,5 @@ std::tuple<CryptoPP::Integer, CryptoPP::Integer, bool> VoterClient::DoVerify() {
   // this->cli_driver->print_left("Lewandowski");
   CryptoPP::Integer a = 1;
   CryptoPP::Integer b = 2;
-  return std::make_tuple(1, 2);
+  return std::make_tuple(1, 2, false);
 }
