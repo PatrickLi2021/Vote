@@ -199,7 +199,7 @@ void VoterClient::HandleRegister(std::string input) {
 
   // Save the ElGamal encrypted vote, ZKP, registrar signature, and blind to both memory and disk
   this->cli_driver->print_left("saving everything");
-  this->vote = encrypted_vote;
+  this->vote = blinded_vote;
   this->vote_zkp = vote_zkp;
   this->registrar_signature = reg_to_voter_blind_sig_msg.registrar_signature;
   this->blind = blinding_factor;
