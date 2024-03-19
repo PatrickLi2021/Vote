@@ -321,7 +321,7 @@ std::tuple<CryptoPP::Integer, CryptoPP::Integer, bool> VoterClient::DoVerify() {
   this->cli_driver->print_left("end of for loop");
 
   // Combines partial decryptions to retrieve final result
-  auto m = ElectionClient::CombineResults(combined_vote, all_partial_decryption_ZKPS);
+  auto m = ElectionClient::CombineResults(combined_vote, all_partial_decryption_ZKPs);
   this->cli_driver->print_left("finished calling combineresults");
   CryptoPP::Integer num_one_votes = m;
   CryptoPP::Integer num_zero_votes = valid_votes.size() - num_one_votes;
