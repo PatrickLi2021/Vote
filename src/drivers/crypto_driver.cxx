@@ -380,23 +380,10 @@ bool CryptoDriver::RSA_BLIND_verify(const RSA::PublicKey &public_key,
   // CryptoPP wiki.
   // 2) Compare the result to the hash of the message `hm` and return
 
-  SecByteBlock buff2, buff3;
-
-  auto verification = public_key.ApplyFunction(signature);
-  size_t req = verification.MinEncodedSize();
-  buff2.resize(req);
-  verification.Encode(&buff2[0], buff2.size());
-
-  // Hash message
-  buff3.resize(SIG_SIZE);
-  SHA256 hash2;
-  hash2.CalculateTruncatedDigest(buff3, buff3.size(), msg_block, msg_block.size());
-
-  // Constant time compare
-  bool equal = buff2.size() == buff3.size() && VerifyBufsEqual(buff2.data(), buff3.data(), buff3.size());
-  if (!equal)
-      throw std::runtime_error("Eve verified failed");
-  return 0;
+  if (public_key.ApplyFunction(signature) == hm) {
+    return true;
+  }
+  return false;
 }
 
 /**
