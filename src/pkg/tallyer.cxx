@@ -188,5 +188,5 @@ void TallyerClient::HandleTally(std::shared_ptr<NetworkDriver> network_driver,
   // VoteRow inserted_vote = this->db_driver->insert_vote(tallyer_to_world_vote_msg);
   
   // network_driver->disconnect();
-  return void;
+  return;
 }

@@ -139,5 +139,5 @@ void ArbiterClient::HandleAdjudicate(std::string _) {
   // partial_decryption_msg.arbiter_id = this->arbiter_config.arbiter_id;
   // partial_decryption_msg.arbiter_vk_path = this->arbiter_config.arbiter_public_key_path;
   // PartialDecryptionRow partial_dec_row = this->db_driver->insert_partial_decryption(partial_decryption_msg);
-  return void;
+  return;
 }
